@@ -28,3 +28,9 @@ Open neovim with the following command:
 ```sh
 nvim --cmd "set rtp+=./" lua/tabu/init.lua
 ```
+
+### TODO
+
+- Select tab
+- Delete tab
+- When a tab is closed, the plugin doesn't work any more.

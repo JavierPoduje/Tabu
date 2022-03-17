@@ -6,7 +6,8 @@ local M = {}
 M.mappings = {
 	n = {
 		["<Esc>"] = ':lua require("tabu").close(%s, %s)<CR>',
-		["<CR>"] = ':lua require("tabu").select_tab(%s, %s)<CR>',
+		["<CR>"] = ':lua require("tabu").select_tab(%s, %s)<CR>', -- TODO
+		["d"] = ':lua require("tabu").delete_tab(%s, %s)<CR>', -- TODO
 		["j"] = ':lua require("tabu").reload_preview(%s, %s, "DOWN")<CR>',
 		["k"] = ':lua require("tabu").reload_preview(%s, %s, "UP")<CR>',
 	},
@@ -59,7 +60,7 @@ M.create_windows = function()
 	}, false)
 	popup.create(preview_bufnr, {
 		border = {},
-		title = "~ Buffers ~",
+		title = "~~ Tabú ~~",
 		highlight = "PreviewHighlight",
 		borderhighlight = "PreviewBorder",
 		enter = false,
@@ -113,8 +114,9 @@ M.set_mappings = function()
 end
 
 M.select_tab = function(pickernr, previewnr)
-  print("pickernr: " .. pickernr)
-  print("previewnr: " .. previewnr)
+	local info = vim.fn.getpos(".") -- get cursor position
+	local curr_cursor_line = info[2]
+  print(curr_cursor_line)
 end
 
 M.load_preview = function(pickernr, previewnr)
@@ -136,7 +138,8 @@ M.reload_preview = function(pickernr, previewnr, direction)
 
 	local number_of_tabs = #vim.api.nvim_buf_get_lines(pickernr, 0, -1, false)
 
-	-- check if next line is valid
+  -- If moving UP on the first line, set next_line to the last line,
+  -- If moving Down on the last line, set next_line to the first line.
 	if not (next_line > 0 and next_line <= number_of_tabs) then
     if next_line == 0 then
       next_line = number_of_tabs
