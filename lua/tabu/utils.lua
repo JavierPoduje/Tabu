@@ -14,4 +14,3 @@ M.format_path = function (path)
 end
 
 return M
-

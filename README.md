@@ -6,7 +6,7 @@ GUI for neovim tabs.
 
 ## Requirements
 
-- [neovim](https://github.com/neovim/neovim) (>= 6.0)
+- [neovim](https://github.com/neovim/neovim) (>= 7.0)
 - [plenary](https://github.com/nvim-lua/plenary.nvim)
 
 ## Keybindings
@@ -17,7 +17,7 @@ GUI for neovim tabs.
 {
   "j" = "move down",
   "k" = "move up"
-  ["<ESC>"] = "close",
+  ["<ESC>"] = "close preview windows",
   ["<CR>"] = "select tab",
 }
 ```
@@ -31,6 +31,4 @@ nvim --cmd "set rtp+=./" lua/tabu/init.lua
 
 ### TODO
 
-- Select tab
 - Delete tab
-- When a tab is closed, the plugin doesn't work any more.

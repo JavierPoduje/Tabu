@@ -1,50 +1,69 @@
+local buffers_by_tab = require("tabu.state")
+local defs = require("tabu.definitions")
 local popup = require("plenary.popup")
 local utils = require("tabu.utils")
 
-local M = {}
+local update_tabs_table = function(tabs)
+	local in_patterns_to_ignore = function(bufname)
+		for _, pattern in pairs(defs.pattern_to_ignore) do
+			if string.match(bufname, pattern) then
+				return true
+			end
+		end
 
-M.mappings = {
-	n = {
-		["<Esc>"] = ':lua require("tabu").close(%s, %s)<CR>',
-		["<CR>"] = ':lua require("tabu").select_tab(%s, %s)<CR>', -- TODO
-		["d"] = ':lua require("tabu").delete_tab(%s, %s)<CR>', -- TODO
-		["j"] = ':lua require("tabu").reload_preview(%s, %s, "DOWN")<CR>',
-		["k"] = ':lua require("tabu").reload_preview(%s, %s, "UP")<CR>',
-	},
-}
+		return false
+	end
 
-local config = {
-	windows = {
-		picker = {
-			id = nil,
-			width = 3,
-		},
-		previewer = {
-			id = nil,
-			width = 80,
-		},
-	},
-	height = 25,
-	borderchars = { "─", "│", "─", "│", "╭", "╮", "╯", "╰" },
-	directions = {
-		UP = -1,
-		DOWN = 1,
-	},
-}
-
-M.buffers_by_tab = {}
-
-M.clean = function()
-  config.windows.picker.id = nil
-  config.windows.previewer.id = nil
-  M.buffers_by_tab = {}
+	for _, tab in pairs(tabs) do
+		buffers_by_tab[tab.tabnr] = {}
+		for _, winnr in pairs(tab.windows) do
+			local bufname = vim.api.nvim_buf_get_name(vim.api.nvim_win_get_buf(winnr))
+			if not in_patterns_to_ignore(bufname) then
+				table.insert(buffers_by_tab[tab.tabnr], vim.api.nvim_win_get_buf(winnr))
+			end
+		end
+	end
 end
 
-M.create_windows = function()
+-- Groups
+local group = vim.api.nvim_create_augroup("Tabu", { clear = true })
+
+vim.api.nvim_create_autocmd("BufDelete", {
+	group = group,
+	callback = function()
+		local tabs = vim.fn.gettabinfo()
+		buffers_by_tab = {}
+		vim.schedule(function()
+			update_tabs_table(tabs)
+		end)
+	end,
+})
+vim.api.nvim_create_autocmd("TabNew", {
+	group = group,
+	callback = function()
+		local tabs = vim.fn.gettabinfo()
+		vim.schedule(function()
+			update_tabs_table(tabs)
+		end)
+	end,
+})
+vim.api.nvim_create_autocmd("TabClosed", {
+	group = group,
+	callback = function()
+		local tabs = vim.fn.gettabinfo()
+		buffers_by_tab = {}
+		vim.schedule(function()
+			update_tabs_table(tabs)
+		end)
+	end,
+})
+
+local M = {}
+
+M._create_windows = function()
 	local pickers_bufnr = v.nvim_create_buf(false, false)
 	local preview_bufnr = v.nvim_create_buf(false, false)
-
-	local total_width = config.windows.picker.width + config.windows.previewer.width
+	local total_width = defs.config.windows.picker.width + defs.config.windows.previewer.width
 
 	popup.create(pickers_bufnr, {
 		border = {},
@@ -52,79 +71,57 @@ M.create_windows = function()
 		highlight = "PickersHighlight",
 		borderhighlight = "PickersBorder",
 		enter = true,
-		line = math.floor(((vim.o.lines - config.height) / 2) - 1),
+		line = math.floor(((vim.o.lines - defs.config.height) / 2) - 1),
 		col = math.floor((vim.o.columns - total_width) / 2),
-		minwidth = config.windows.picker.width,
-		minheight = config.height,
-		borderchars = config.borderchars,
+		minwidth = defs.config.windows.picker.width,
+		minheight = defs.config.height,
+		borderchars = defs.config.borderchars,
 	}, false)
 	popup.create(preview_bufnr, {
 		border = {},
-		title = "~~ Tabú ~~",
+		title = "~ Tabú ~",
 		highlight = "PreviewHighlight",
 		borderhighlight = "PreviewBorder",
 		enter = false,
-		line = math.floor(((vim.o.lines - config.height) / 2) - 1),
-		col = math.floor(((vim.o.columns - total_width) + config.windows.picker.width + 6) / 2),
-		minwidth = config.windows.previewer.width,
-		minheight = config.height,
-		borderchars = config.borderchars,
+		line = math.floor(((vim.o.lines - defs.config.height) / 2) - 1),
+		col = math.floor(((vim.o.columns - total_width) + defs.config.windows.picker.width + 6) / 2),
+		minwidth = defs.config.windows.previewer.width,
+		minheight = defs.config.height,
+		borderchars = defs.config.borderchars,
 	}, false)
 
-	config.windows.picker.id = pickers_bufnr
-	config.windows.previewer.id = preview_bufnr
-	M.set_mappings()
+	defs.config.windows.picker.id = pickers_bufnr
+	defs.config.windows.previewer.id = preview_bufnr
 end
 
-M.populate_buffers_by_tab = function()
-	local tabnrs = vim.api.nvim_list_tabpages()
-	for tab_idx, tab_nr in ipairs(tabnrs) do
-		-- populate a table with the buffers posibilities by tabs
-		M.buffers_by_tab[tab_idx] = {}
-
-		local windownrs = vim.api.nvim_tabpage_list_wins(tab_nr)
-		for win_nr, win_id in ipairs(windownrs) do
-			local bufnr = vim.api.nvim_win_get_buf(win_id)
-			local bufname = vim.api.nvim_buf_get_name(bufnr)
-			-- exclude tab-manager's windows
-			if bufnr ~= config.windows.picker.id and bufnr ~= config.windows.previewer.id and bufname ~= "" then
-				table.insert(M.buffers_by_tab[tab_nr], bufnr)
-			end
+M._set_mappings = function()
+	for mode in pairs(defs.mappings) do
+		for key_bind in pairs(defs.mappings[mode]) do
+			local func = string.format(
+				defs.mappings[mode][key_bind],
+				defs.config.windows.picker.id,
+				defs.config.windows.previewer.id
+			)
+			vim.api.nvim_buf_set_keymap(defs.config.windows.picker.id, mode, key_bind, func, { silent = true })
 		end
 	end
 end
 
-M.display_buffers_by_tab = function()
+M._display_buffers_by_tab = function()
 	-- populate pickers window
-	for tab_idx, tab_nr in ipairs(M.buffers_by_tab) do
+	for tab_idx, _ in ipairs(buffers_by_tab) do
 		local line = { " " .. tostring(tab_idx) .. " " }
-		vim.api.nvim_buf_set_lines(config.windows.picker.id, tab_idx - 1, -1, true, line)
+		vim.api.nvim_buf_set_lines(defs.config.windows.picker.id, tab_idx - 1, -1, true, line)
 	end
-
-	M.load_preview(config.windows.picker.id, config.windows.previewer.id)
+	M._load_preview(defs.config.windows.picker.id, defs.config.windows.previewer.id)
 end
 
-M.set_mappings = function()
-	for mode in pairs(M.mappings) do
-		for key_bind in pairs(M.mappings[mode]) do
-			local func = string.format(M.mappings[mode][key_bind], config.windows.picker.id, config.windows.previewer.id)
-			vim.api.nvim_buf_set_keymap(config.windows.picker.id, mode, key_bind, func, { silent = true })
-		end
-	end
-end
-
-M.select_tab = function(pickernr, previewnr)
-	local info = vim.fn.getpos(".") -- get cursor position
-	local curr_cursor_line = info[2]
-  print(curr_cursor_line)
-end
-
-M.load_preview = function(pickernr, previewnr)
+M._load_preview = function(pickernr, previewnr)
 	local info = vim.fn.getpos(".")
 	local curr_cursor_line = info[2]
 
 	local lines = {}
-	for _, buf_value in ipairs(M.buffers_by_tab[curr_cursor_line]) do
+	for _, buf_value in ipairs(buffers_by_tab[curr_cursor_line]) do
 		local formatted_path = utils.format_path(vim.api.nvim_buf_get_name(buf_value))
 		table.insert(lines, formatted_path)
 	end
@@ -134,43 +131,53 @@ end
 M.reload_preview = function(pickernr, previewnr, direction)
 	local info = vim.fn.getpos(".") -- get cursor position
 	local curr_cursor_line = info[2]
-	local next_line = curr_cursor_line + config.directions[direction]
+	local next_line = curr_cursor_line + defs.config.directions[direction]
 
 	local number_of_tabs = #vim.api.nvim_buf_get_lines(pickernr, 0, -1, false)
 
-  -- If moving UP on the first line, set next_line to the last line,
-  -- If moving Down on the last line, set next_line to the first line.
+	-- check if next line is valid
 	if not (next_line > 0 and next_line <= number_of_tabs) then
-    if next_line == 0 then
-      next_line = number_of_tabs
-    else
-      next_line = 1
-    end
+		if next_line == 0 then
+			next_line = number_of_tabs
+		else
+			next_line = 1
+		end
 	end
 
 	vim.fn.setpos(".", { pickernr, next_line, 1, 1 })
 
 	local new_lines = {}
+	for _, buf_value in pairs(buffers_by_tab[next_line]) do
+		local formatted_path = utils.format_path(vim.api.nvim_buf_get_name(buf_value))
+		table.insert(new_lines, formatted_path)
+	end
+	vim.api.nvim_buf_set_lines(previewnr, 0, -1, true, new_lines)
+end
 
-  for _, buf_value in pairs(M.buffers_by_tab[next_line]) do
-    local formatted_path = utils.format_path(vim.api.nvim_buf_get_name(buf_value))
-    table.insert(new_lines, formatted_path)
-  end
-  vim.api.nvim_buf_set_lines(previewnr, 0, -1, true, new_lines)
+M.clean = function()
+	defs.config.windows.picker.id = nil
+	defs.config.windows.previewer.id = nil
+end
+
+M.debug = function()
+	M._create_windows()
+	M._set_mappings()
+	M._display_buffers_by_tab()
 end
 
 M.close = function(pickernr, previewnr)
-  M.clean()
+	M.clean()
 	v.nvim_exec(string.format("%s,%sbw!", pickernr, previewnr), true)
 end
 
-M.run = function()
-  M.create_windows()
-  M.populate_buffers_by_tab()
-  M.display_buffers_by_tab()
+M.select_tab = function(pickernr, previewnr)
+	M.close(pickernr, previewnr)
+
+	local info = vim.fn.getpos(".")
+	local tab_num = info[2]
+	vim.api.nvim_exec(":tabn" .. tab_num, true)
 end
 
-vim.api.nvim_set_keymap('n', '<Leader>a', ':lua require("tabu").run()<CR>', { noremap = true, silent = true })
+vim.api.nvim_set_keymap("n", "<Leader>a", ':lua require"tabu.init".debug()<CR>', { noremap = true, silent = true })
 
 return M
-
