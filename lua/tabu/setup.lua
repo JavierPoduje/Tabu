@@ -3,10 +3,11 @@ local M = {}
 local definitions = {
 	mappings = {
 		n = {
-			["<Esc>"] = ':lua require("tabu.init").close(%s, %s)<CR>',
-			["<CR>"] = ':lua require("tabu.init").select_tab(%s, %s)<CR>',
-			["j"] = ':lua require("tabu.init").reload_preview(%s, %s, "DOWN")<CR>',
-			["k"] = ':lua require("tabu.init").reload_preview(%s, %s, "UP")<CR>',
+			["<Esc>"] = ':lua require("tabu").close(%s, %s)<CR>',
+			["<C-c>"] = ':lua require("tabu").close(%s, %s)<CR>',
+			["<CR>"] = ':lua require("tabu").select_tab(%s, %s)<CR>',
+			["j"] = ':lua require("tabu").reload_preview(%s, %s, "DOWN")<CR>',
+			["k"] = ':lua require("tabu").reload_preview(%s, %s, "UP")<CR>',
 		},
 	},
 	config = {

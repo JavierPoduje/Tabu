@@ -7,4 +7,3 @@ return setmetatable(M, {
 		return buffers_by_tabs[k]
 	end,
 })
-
