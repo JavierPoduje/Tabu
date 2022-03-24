@@ -6,6 +6,7 @@ local definitions = {
 			["<Esc>"] = ':lua require("tabu").close(%s, %s)<CR>',
 			["<C-c>"] = ':lua require("tabu").close(%s, %s)<CR>',
 			["<CR>"] = ':lua require("tabu").select_tab(%s, %s)<CR>',
+			["dd"] = ':lua require("tabu").delete_tab(%s, %s)<CR>',
 			["j"] = ':lua require("tabu").reload_preview(%s, %s, "DOWN")<CR>',
 			["k"] = ':lua require("tabu").reload_preview(%s, %s, "UP")<CR>',
 		},
@@ -29,7 +30,8 @@ local definitions = {
 		},
 	},
   pattern_to_ignore = {
-    "NvimTree"
+    "NvimTree",
+    "/tmp/"
   }
 }
 

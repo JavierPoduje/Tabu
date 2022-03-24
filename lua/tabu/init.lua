@@ -12,11 +12,15 @@ local _in_patterns_to_ignore = function(bufname)
 	return false
 end
 
-local update_tabs_table = function(tabs)
+local update_tabs_table = function(tabs, deleted_bufnr)
 	for _, tab in pairs(tabs) do
+    P(tab)
 		buffers_by_tab[tab.tabnr] = {}
 		for _, winnr in pairs(tab.windows) do
-			local bufname = vim.api.nvim_buf_get_name(vim.api.nvim_win_get_buf(winnr))
+      local bufnr = vim.api.nvim_win_get_buf(winnr)
+			local bufname = vim.api.nvim_buf_get_name(bufnr)
+      print("deleted_bufnr: " .. tostring(deleted_bufnr))
+      print("bufnr: " .. tostring(bufnr))
 			if not _in_patterns_to_ignore(bufname) then
 				table.insert(buffers_by_tab[tab.tabnr], vim.api.nvim_win_get_buf(winnr))
 			end
@@ -32,8 +36,9 @@ vim.api.nvim_create_autocmd("BufDelete", {
 	group = group,
 	callback = function()
 		local tabs = vim.fn.gettabinfo()
+    local bufnr = vim.fn.expand("<amatch>")
 		vim.schedule(function()
-			update_tabs_table(tabs)
+			update_tabs_table(tabs, bufnr)
 		end)
 	end,
 })
@@ -42,7 +47,7 @@ vim.api.nvim_create_autocmd("TabNew", {
 	callback = function()
 		local tabs = vim.fn.gettabinfo()
 		vim.schedule(function()
-			update_tabs_table(tabs)
+			update_tabs_table(tabs, nil)
 		end)
 	end,
 })
@@ -51,7 +56,7 @@ vim.api.nvim_create_autocmd("TabClosed", {
 	callback = function()
 		local tabs = vim.fn.gettabinfo()
 		vim.schedule(function()
-			update_tabs_table(tabs)
+			update_tabs_table(tabs, nil)
 		end)
 	end,
 })
@@ -189,6 +194,19 @@ M.select_tab = function(pickernr, previewnr)
 	local tab_num = info[2]
 	vim.api.nvim_exec(":tabn" .. tab_num, true)
 	M.close(pickernr, previewnr)
+end
+
+M.delete_tab = function(pickernr, previewnr)
+	local info = vim.fn.getpos(".")
+	local tab_num = info[2]
+	local tabs = vim.fn.gettabinfo()
+  if tab_num == 1 and #tabs == 1 then
+    print("we won't close your last tab, dude...")
+  else
+    vim.api.nvim_exec(":tabclose" .. tab_num, true)
+    M.close(pickernr, previewnr)
+    M.debug()
+  end
 end
 
 vim.api.nvim_set_keymap("n", "<Leader>a", ':lua require"tabu.init".debug()<CR>', { noremap = true, silent = true })
